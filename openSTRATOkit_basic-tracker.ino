@@ -58,6 +58,7 @@
 #include <util/crc16.h>
 #include <SPI.h>
 #include <SD.h>
+#include "MPU9250.h"
 
 // Radio Settings
 #define FREQ 434.690
@@ -66,9 +67,9 @@
 #define ENC ASCII
 #define STOPB 2
 
-String call = "N0CALL"; // CHANGE THIS!
+#define CALL "TTS8";
+
 long pkt_num = 1; // packet number
-float batt_voltage;
 
 File myFile;
 
@@ -81,6 +82,8 @@ TinyGPSPlus gps;
 
 Adafruit_BME280 bme;
 
+MPU9250 IMU(Wire,0x68);
+
 void(* resetFunc) (void) = 0; //declare reset function @ address 0
 
 void setup() {
@@ -90,7 +93,7 @@ void setup() {
   Serial3.begin(115200);
   Serial1.pins(18, 19);
   Serial1.begin(9600);
-  Serial3.println("openSTRATOtracker");
+  Serial3.println("openSTRATOtracker (modified)");
   Serial3.println();
 
   // init and check for BME280
@@ -132,8 +135,8 @@ void setup() {
     Serial3.println(F("success!"));
   } else {
     Serial3.print(F("failed, code "));
-    resetFunc();
     Serial3.println(state);
+    resetFunc();
     while (true);
   }
 
@@ -147,6 +150,14 @@ void setup() {
   SPI.pins(30, 31, 32, 33);
 
   digitalWrite(33,1);
+
+  state = IMU.begin();
+  if (state < 0) {
+    Serial3.print(F("IMU initialization failed, code "));
+    Serial3.println(state);
+    resetFunc();
+    while (true);
+  }
 
   // init SD card
   Serial3.print("[SD] Initializing SD card...");
@@ -172,17 +183,78 @@ void loop() {
   }
 }
 
+
+//Hardware pin definitions
+// int UVOUT = A0; //Output from the sensor
+// int REF_3V3 = A1; //3.3V power on the Arduino board
+
+// void setup()
+// {
+//   Serial.begin(9600);
+//
+//   pinMode(UVOUT, INPUT);
+//   pinMode(REF_3V3, INPUT);
+//
+//   Serial.println("MP8511 example");
+// }
+//
+// void loop()
+// {
+//   int uvLevel = averageAnalogRead(UVOUT);
+//   int refLevel = averageAnalogRead(REF_3V3);
+//
+//   Use the 3.3V power pin as a reference to get a very accurate output value from sensor
+//   float outputVoltage = 3.3 / refLevel * uvLevel;
+//
+//   float uvIntensity = mapfloat(outputVoltage, 0.99, 2.9, 0.0, 15.0);
+//
+//   Serial.print("MP8511 output: ");
+//   Serial.print(uvLevel);
+//
+//   Serial.print(" MP8511 voltage: ");
+//   Serial.print(outputVoltage);
+//
+//   Serial.print(" UV Intensity (mW/cm^2): ");
+//   Serial.print(uvIntensity);
+//
+//   Serial.println();
+//
+//   delay(100);
+// }
+
+//Takes an average of readings on a given pin
+//Returns the average
+int averageAnalogRead(int pinToRead)
+{
+  byte numberOfReadings = 8;
+  unsigned int runningValue = 0;
+
+  for(int x = 0 ; x < numberOfReadings ; x++)
+    runningValue += analogRead(pinToRead);
+  runningValue /= numberOfReadings;
+
+  return(runningValue);
+}
+
+//The Arduino Map function but for floats
+//From: http://forum.arduino.cc/index.php?topic=3922.0
+float mapfloat(float x, float in_min, float in_max, float out_min, float out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
 // compile sensor information and transmit it
 void sendData() {
 
-  // calculate battery voltage
-  batt_voltage = (analogRead(A3) * 3.3 / 1024) *
-                 ((15.0 + 33.0) / 33.0); // divider 15k and 33k
+  // the condition is not really relevant anymore with more data being reported
+  if (true /*gps.location.isUpdated() && gps.altitude.isUpdated()*/) {
 
-  if (gps.location.isUpdated() && gps.altitude.isUpdated()) {
+    float batt_voltage = (analogRead(A3) * 3.3 / 1024) *
+                ((15.0 + 33.0) / 33.0); // divider 15k and 33k
+
     String datastring;
 
-    datastring = "$$$$" + call + ",";    // Call
+    datastring += "$$$$"; datastring += CALL; datastring += ",";
     datastring += String(pkt_num) + ","; // Packet number
 
     // GPS time
@@ -216,6 +288,46 @@ void sendData() {
     unsigned int CHECKSUM = gps_CRC16_checksum(datastring.c_str());
     char checksum_str[6];
     sprintf(checksum_str, "*%04X", CHECKSUM);
+    datastring += String(checksum_str);
+
+    int secret_start = datastring.length();
+
+    // start of the super secret message
+    datastring += "\nhehe";
+
+    // calculate battery voltage
+    // uv - shamelessly taken from http://wiki.sunfounder.cc/index.php?title=GYML8511_UV_Sensor
+    float uvIntensity;
+    {
+        // uv
+        int uvLevel = averageAnalogRead(A0);
+        int refLevel = averageAnalogRead(A1);
+
+        //Use the 3.3V power pin as a reference to get a very accurate output value from sensor
+        float outputVoltage = 3.3 / refLevel * uvLevel;
+
+        uvIntensity = mapfloat(outputVoltage, 0.99, 2.9, 0.0, 15.0);
+        datastring += String(uvIntensity, 6) + ",";
+    }
+
+    // taken from https://robojax.com/learn/arduino/?vid=robojax-MPU9250
+    {
+        IMU.readSensor();
+        datastring += String(IMU.getAccelX_mss(), 3) + ",";
+        datastring += String(IMU.getAccelY_mss(), 3) + ",";
+        datastring += String(IMU.getAccelZ_mss(), 3) + ",";
+
+        datastring += String(IMU.getGyroX_rads(), 3) + ",";
+        datastring += String(IMU.getGyroY_rads(), 3) + ",";
+        datastring += String(IMU.getGyroZ_rads(), 3) + ",";
+
+        datastring += String(IMU.getMagX_uT(), 3) + ",";
+        datastring += String(IMU.getMagY_uT(), 3) + ",";
+        datastring += String(IMU.getMagZ_uT(), 3);
+    }
+
+    unsigned int CHECKSUM2 = gps_CRC16_checksum(datastring.c_str() + secret_start);
+    sprintf(checksum_str, "*%04X", CHECKSUM2);
     datastring += String(checksum_str);
 
     // transmit the data
