@@ -87,6 +87,13 @@ MPU9250 IMU(Wire, 0x68);
 
 void (*resetFunc)(void) = 0; // declare reset function @ address 0
 
+#define FATAL_REPORT_AND_RESET(code) \
+    Serial3.print("Fatal error, code: "); \
+    Serial3.println(code); \
+    delay(500); \
+    resetFunc(); \
+    while (true) {}
+
 void setup() {
 
   // init serial comm
@@ -98,10 +105,11 @@ void setup() {
   Serial3.println();
 
   // init and check for BME280
-  if (!bme.begin(0x76)) {
-    Serial3.print("[BME280], no BME280 detected...");
-  } else
+  if (bme.begin(0x76)) {
     Serial3.println("[BME280] found...");
+  } else
+    Serial3.print("[BME280], no BME280 detected...");
+    FATAL_REPORT_AND_RESET(0)
 
   // init radio
   Serial3.print(F("[RF69] Initializing ... "));
@@ -112,11 +120,7 @@ void setup() {
   if (state == ERR_NONE) {
     Serial3.println(F("success!"));
   } else {
-    Serial3.print(F("failed, code "));
-    Serial3.println(state);
-    resetFunc();
-    while (true)
-      ;
+    FATAL_REPORT_AND_RESET(state)
   }
 
   // radio output power
@@ -125,11 +129,7 @@ void setup() {
   if (state == ERR_NONE) {
     Serial3.println(F("success!"));
   } else {
-    Serial3.print(F("failed, code "));
-    Serial3.println(state);
-    resetFunc();
-    while (true)
-      ;
+    FATAL_REPORT_AND_RESET(state)
   }
 
   // set-up rtty comm
@@ -138,11 +138,7 @@ void setup() {
   if (state == ERR_NONE) {
     Serial3.println(F("success!"));
   } else {
-    Serial3.print(F("failed, code "));
-    Serial3.println(state);
-    resetFunc();
-    while (true)
-      ;
+    FATAL_REPORT_AND_RESET(state)
   }
 
   // set-up GPS
@@ -158,19 +154,15 @@ void setup() {
 
   state = IMU.begin();
   if (state < 0) {
-    Serial3.print(F("IMU initialization failed, code "));
-    Serial3.println(state);
-    resetFunc();
-    while (true)
-      ;
+    FATAL_REPORT_AND_RESET(state)
   }
 
   // init SD card
   Serial3.print("[SD] Initializing SD card...");
-  if (!SD.begin(10)) {
-    Serial3.println("initialization failed!");
-  } else
+  if (SD.begin(10)) {
     Serial3.println(F("success!"));
+  } else
+    FATAL_REPORT_AND_RESET(0)
 }
 
 void loop() {
