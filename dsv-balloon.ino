@@ -58,7 +58,7 @@
 #include <SD.h>
 #include <SPI.h>
 #include <TinyGPS++.h>
-#include <Wire.h>
+// #include <Wire.h>
 #include <util/crc16.h>
 
 // Radio Settings
@@ -101,49 +101,49 @@ void setup() {
   Serial3.begin(115200);
   Serial1.pins(18, 19);
   Serial1.begin(9600);
-  Serial3.println("openSTRATOtracker (modified)");
+  Serial3.println("\nopenSTRATOtracker (modified)");
   Serial3.println();
 
   // init and check for BME280
   Serial3.println("[BME280] Initializing...");
   if (bme.begin(0x76)) {
-    Serial3.println(F("success!"));
+    Serial3.println("success!");
   } else {
     FATAL_REPORT_AND_RESET(0)
   }
 
   // init radio
-  Serial3.print(F("[RF69] Initializing ... "));
+  Serial3.print("[RF69] Initializing ... ");
   SPI.pins(30, 31, 32, 33);
   int state = radio.begin();
 
   // check for errors
   if (state == ERR_NONE) {
-    Serial3.println(F("success!"));
+    Serial3.println("success!");
   } else {
     FATAL_REPORT_AND_RESET(state)
   }
 
   // radio output power
-  Serial3.print(F("[RF69] Setting high power module ... "));
+  Serial3.print("[RF69] Setting high power module ... ");
   state = radio.setOutputPower(20, true);
   if (state == ERR_NONE) {
-    Serial3.println(F("success!"));
+    Serial3.println("success!");
   } else {
     FATAL_REPORT_AND_RESET(state)
   }
 
   // set-up rtty comm
-  Serial3.print(F("[RTTY] Initializing ... "));
+  Serial3.print("[RTTY] Initializing ... ");
   state = rtty.begin(FREQ, SHIFT, BAUD, ENC, STOPB);
   if (state == ERR_NONE) {
-    Serial3.println(F("success!"));
+    Serial3.println("success!");
   } else {
     FATAL_REPORT_AND_RESET(state)
   }
 
   // set-up GPS
-  Serial3.println(F("[GPS] Set flight mode ... "));
+  Serial3.println("[GPS] Set flight mode ... ");
   setGPS_DynamicModel6();
   delay(500);
   setGps_MaxPerformanceMode();
@@ -151,20 +151,23 @@ void setup() {
   SPI.pins(30, 31, 32, 33);
   digitalWrite(33, 1);
 
+  // IMU
   Serial3.println("[IMU] Initializing ... ");
   state = IMU.begin();
-  if (state < 0) {
-    FATAL_REPORT_AND_RESET(state)
+  if (state > 0) {
+    Serial3.println("success!");
   } else {
-    Serial3.println(F("success!"));
+    FATAL_REPORT_AND_RESET(state)
   }
 
   // init SD card
-  Serial3.print("[SD] Initializing SD card...");
-  if (SD.begin(10)) {
-    Serial3.println(F("success!"));
-  } else
-    FATAL_REPORT_AND_RESET(0)
+  Serial3.print("[SD] Initializing SD card ... ");
+  state = SD.begin(10);
+  if (state) {
+    Serial3.println("success!");
+  } else {
+    FATAL_REPORT_AND_RESET(state)
+  }
 }
 
 void loop() {
@@ -177,7 +180,7 @@ void loop() {
 
   // try to fix the GPS in case of a malfunction
   if (millis() > 5000 && gps.charsProcessed() < 10) {
-    Serial3.println(F("No GPS detected."));
+    Serial3.println("No GPS detected.");
     resetGPS();
     resetFunc();
     while (true)
@@ -338,7 +341,7 @@ void sendData() {
     datastring += String(checksum_str);
 
     // transmit the data
-    Serial3.println(F("[RTTY] Sending RTTY data ... "));
+    Serial3.println("[RTTY] Sending RTTY data ... ");
 
     // send out idle condition for 500 ms
     rtty.idle();
@@ -347,7 +350,7 @@ void sendData() {
     Serial3.println(datastring);
     rtty.println(datastring);
 
-    Serial3.println(F("[RTTY] Done!"));
+    Serial3.println("[RTTY] Done!");
     writeData(datastring); // write a copy to the SD card
     pkt_num++;             // advance packet number
   }
