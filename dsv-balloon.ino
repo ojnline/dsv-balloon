@@ -105,11 +105,12 @@ void setup() {
   Serial3.println();
 
   // init and check for BME280
+  Serial3.println("[BME280] Initializing...");
   if (bme.begin(0x76)) {
-    Serial3.println("[BME280] found...");
-  } else
-    Serial3.print("[BME280], no BME280 detected...");
+    Serial3.println(F("success!"));
+  } else {
     FATAL_REPORT_AND_RESET(0)
+  }
 
   // init radio
   Serial3.print(F("[RF69] Initializing ... "));
@@ -147,14 +148,15 @@ void setup() {
   delay(500);
   setGps_MaxPerformanceMode();
   delay(500);
-
   SPI.pins(30, 31, 32, 33);
-
   digitalWrite(33, 1);
 
+  Serial3.println("[IMU] Initializing ... ");
   state = IMU.begin();
   if (state < 0) {
     FATAL_REPORT_AND_RESET(state)
+  } else {
+    Serial3.println(F("success!"));
   }
 
   // init SD card
