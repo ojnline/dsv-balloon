@@ -83,7 +83,7 @@ TinyGPSPlus gps;
 
 Adafruit_BME280 bme;
 
-MPU9250 IMU(Wire, 0x68);
+// MPU9250 IMU(Wire, 0x68);
 
 void (*resetFunc)(void) = 0; // declare reset function @ address 0
 
@@ -151,14 +151,14 @@ void setup() {
   SPI.pins(30, 31, 32, 33);
   digitalWrite(33, 1);
 
-  // IMU
-  Serial3.println("[IMU] Initializing ... ");
-  state = IMU.begin();
-  if (state > 0) {
-    Serial3.println("success!");
-  } else {
-    FATAL_REPORT_AND_RESET(state)
-  }
+//   IMU
+//   Serial3.println("[IMU] Initializing ... ");
+//   state = IMU.begin();
+//   if (state > 0) {
+//     Serial3.println("success!");
+//   } else {
+//     FATAL_REPORT_AND_RESET(state)
+//   }
 
   // init SD card
   Serial3.print("[SD] Initializing SD card ... ");
@@ -291,17 +291,6 @@ void sendData() {
     datastring += String(bme.readPressure(), 0) + ","; // pressure
     datastring += String(gps.satellites.value());      // sats
 
-    // checksum
-    unsigned int CHECKSUM = gps_CRC16_checksum(datastring.c_str());
-    char checksum_str[6];
-    sprintf(checksum_str, "*%04X", CHECKSUM);
-    datastring += String(checksum_str);
-
-    int secret_start = datastring.length();
-
-    // start of the super secret message
-    datastring += "\nhehe";
-
     // calculate battery voltage
     // uv - shamelessly taken from
     // http://wiki.sunfounder.cc/index.php?title=GYML8511_UV_Sensor
@@ -319,26 +308,30 @@ void sendData() {
       datastring += String(uvIntensity, 6) + ",";
     }
 
-    // taken from https://robojax.com/learn/arduino/?vid=robojax-MPU9250
-    {
-      IMU.readSensor();
-      datastring += String(IMU.getAccelX_mss(), 3) + ",";
-      datastring += String(IMU.getAccelY_mss(), 3) + ",";
-      datastring += String(IMU.getAccelZ_mss(), 3) + ",";
+//     taken from https://robojax.com/learn/arduino/?vid=robojax-MPU9250
+//     {
+//       IMU.readSensor();
+//       datastring += String(IMU.getAccelX_mss(), 3) + ",";
+//       datastring += String(IMU.getAccelY_mss(), 3) + ",";
+//       datastring += String(IMU.getAccelZ_mss(), 3) + ",";
+//
+//       datastring += String(IMU.getGyroX_rads(), 3) + ",";
+//       datastring += String(IMU.getGyroY_rads(), 3) + ",";
+//       datastring += String(IMU.getGyroZ_rads(), 3) + ",";
+//
+//       datastring += String(IMU.getMagX_uT(), 3) + ",";
+//       datastring += String(IMU.getMagY_uT(), 3) + ",";
+//       datastring += String(IMU.getMagZ_uT(), 3);
+//     }
 
-      datastring += String(IMU.getGyroX_rads(), 3) + ",";
-      datastring += String(IMU.getGyroY_rads(), 3) + ",";
-      datastring += String(IMU.getGyroZ_rads(), 3) + ",";
 
-      datastring += String(IMU.getMagX_uT(), 3) + ",";
-      datastring += String(IMU.getMagY_uT(), 3) + ",";
-      datastring += String(IMU.getMagZ_uT(), 3);
-    }
-
-    unsigned int CHECKSUM2 =
-        gps_CRC16_checksum(datastring.c_str() + secret_start);
-    sprintf(checksum_str, "*%04X", CHECKSUM2);
+    // checksum
+    unsigned int CHECKSUM = gps_CRC16_checksum(datastring.c_str());
+    char checksum_str[6];
+    sprintf(checksum_str, "*%04X", CHECKSUM);
     datastring += String(checksum_str);
+
+    int secret_start = datastring.length();
 
     // transmit the data
     Serial3.println("[RTTY] Sending RTTY data ... ");
