@@ -250,7 +250,7 @@ float mapfloat(float x, float in_min, float in_max, float out_min,
 void sendData() {
 
   // the condition is not really relevant anymore with more data being reported
-  if (true /*gps.location.isUpdated() && gps.altitude.isUpdated()*/) {
+  if (gps.location.isUpdated() && gps.altitude.isUpdated()) {
 
     float batt_voltage = (analogRead(A3) * 3.3 / 1024) *
                          ((15.0 + 33.0) / 33.0); // divider 15k and 33k
@@ -305,33 +305,14 @@ void sendData() {
       float outputVoltage = 3.3 / refLevel * uvLevel;
 
       uvIntensity = mapfloat(outputVoltage, 0.99, 2.9, 0.0, 15.0);
-      datastring += String(uvIntensity, 6) + ",";
+      datastring += String(uvIntensity, 3);
     }
-
-//     taken from https://robojax.com/learn/arduino/?vid=robojax-MPU9250
-//     {
-//       IMU.readSensor();
-//       datastring += String(IMU.getAccelX_mss(), 3) + ",";
-//       datastring += String(IMU.getAccelY_mss(), 3) + ",";
-//       datastring += String(IMU.getAccelZ_mss(), 3) + ",";
-//
-//       datastring += String(IMU.getGyroX_rads(), 3) + ",";
-//       datastring += String(IMU.getGyroY_rads(), 3) + ",";
-//       datastring += String(IMU.getGyroZ_rads(), 3) + ",";
-//
-//       datastring += String(IMU.getMagX_uT(), 3) + ",";
-//       datastring += String(IMU.getMagY_uT(), 3) + ",";
-//       datastring += String(IMU.getMagZ_uT(), 3);
-//     }
-
 
     // checksum
     unsigned int CHECKSUM = gps_CRC16_checksum(datastring.c_str());
     char checksum_str[6];
     sprintf(checksum_str, "*%04X", CHECKSUM);
     datastring += String(checksum_str);
-
-    int secret_start = datastring.length();
 
     // transmit the data
     Serial3.println("[RTTY] Sending RTTY data ... ");
